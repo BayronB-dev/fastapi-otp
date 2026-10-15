@@ -1,0 +1,36 @@
+# Blueprint de Render: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: auth-otp-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # Un solo worker: SQLite y el rate limiter en memoria no se comparten entre procesos.
+    startCommand: gunicorn app.main:app -k uvicorn_worker.UvicornWorker -w 1 --bind 0.0.0.0:$PORT --access-logfile -
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:///./app.db
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: OTP_EXPIRE_MINUTES
+        value: "15"
+      - key: EMAIL_BACKEND
+        value: smtp
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USE_TLS
+        value: "true"
+      # Estos se completan a mano en el panel de Render (no se suben al repo).
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
