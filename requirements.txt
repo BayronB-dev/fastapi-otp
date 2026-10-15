@@ -1,0 +1,14 @@
+fastapi==0.143.2
+uvicorn[standard]==0.54.0
+gunicorn==26.2.0
+SQLAlchemy==2.1.4
+pydantic[email]==2.14.1
+pydantic-settings==2.16.0
+bcrypt==5.0.0
+PyJWT==2.15.1
+pyotp==2.10.0
+python-dotenv==1.2.4
+
+# Testing
+pytest==9.1.1
+httpx==0.28.1
