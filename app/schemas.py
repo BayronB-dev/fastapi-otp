@@ -1,7 +1,7 @@
 """Esquemas Pydantic: validan los datos de entrada y dan forma a las respuestas."""
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -98,6 +98,12 @@ class UserOut(BaseModel):
     full_name: str
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def ensure_utc(cls, value: datetime) -> datetime:
+        """SQLite devuelve fechas sin zona horaria; se marcan como UTC."""
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
 class MessageOut(BaseModel):
