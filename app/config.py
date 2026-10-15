@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # JWT
-    secret_key: str = "dev-secret-key-change-me"
+    # Solo para desarrollo; en producción se exige definir SECRET_KEY (ver main.py).
+    secret_key: str = "dev-only-secret-key-change-me-in-production-0123456789"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
