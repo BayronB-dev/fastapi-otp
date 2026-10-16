@@ -164,6 +164,19 @@ def test_login_rate_limit(client, registered_user):
     assert codes[5] == 429
 
 
+def test_security_headers(client):
+    """Todas las respuestas llevan cabeceras de seguridad; la API no se cachea."""
+    response = client.get("/users/profile")  # incluso en un 401 del middleware
+    assert response.status_code == 401
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+    assert response.headers["Cache-Control"] == "no-store"
+
+    # Swagger necesita su CDN, así que no lleva la CSP estricta.
+    assert "Content-Security-Policy" not in client.get("/docs").headers
+
+
 def test_health_endpoint(client):
     """El endpoint de salud responde sin autenticación."""
     assert client.get("/health").json() == {"status": "ok"}

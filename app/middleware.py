@@ -1,4 +1,4 @@
-"""Middleware de autenticación: valida el token JWT en las rutas protegidas."""
+"""Middlewares: autenticación JWT en rutas protegidas y cabeceras de seguridad HTTP."""
 
 from datetime import datetime, timezone
 
@@ -11,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import Response
 
 from app import database
+from app.config import settings
 from app.models import LoginSession, User
 from app.security import as_utc, decode_access_token, hash_token
 
@@ -67,6 +68,48 @@ class AuthMiddleware(BaseHTTPMiddleware):
         request.state.session_id = session_id
         request.state.token = token
         return await call_next(request)
+
+
+#: Política de seguridad de contenido para la interfaz web: solo se permite
+#: cargar scripts, estilos e imágenes del propio dominio (sin scripts en línea),
+#: lo que bloquea la mayoría de ataques XSS aunque se colara HTML malicioso.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+    "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+)
+
+#: Swagger y ReDoc cargan recursos de un CDN y usan scripts en línea, así que
+#: no se les aplica la CSP estricta.
+DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Añade cabeceras de seguridad HTTP a todas las respuestas.
+
+    * ``X-Content-Type-Options: nosniff``: el navegador no "adivina" tipos de archivo.
+    * ``X-Frame-Options: DENY``: la página no puede incrustarse en un iframe (clickjacking).
+    * ``Referrer-Policy: no-referrer``: no se filtra la URL a otros sitios.
+    * ``Content-Security-Policy``: limita de dónde se cargan scripts y estilos (XSS).
+    * ``Cache-Control: no-store`` en la API: datos personales y tokens no se guardan en caché.
+    * ``Strict-Transport-Security`` en producción: fuerza HTTPS.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        """Ejecuta la petición y añade las cabeceras a la respuesta."""
+        response = await call_next(request)
+        path = request.url.path
+        headers = response.headers
+        headers["X-Content-Type-Options"] = "nosniff"
+        headers["X-Frame-Options"] = "DENY"
+        headers["Referrer-Policy"] = "no-referrer"
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if not path.startswith(DOCS_PATHS):
+            headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        if path.startswith(("/auth", "/users", "/tasks")):
+            headers["Cache-Control"] = "no-store"
+        if settings.environment == "production":
+            headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
 
 def check_session(token: str, user_id: int) -> tuple[str | None, int | None]:
