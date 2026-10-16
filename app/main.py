@@ -18,13 +18,29 @@ logger = logging.getLogger("app")
 
 
 def check_production_settings() -> None:
-    """Impide arrancar en producción con la clave secreta de desarrollo o el correo en consola."""
+    """Impide arrancar en producción con una configuración incompleta.
+
+    Exige una ``SECRET_KEY`` propia y el envío real de correos con los datos
+    SMTP completos; si falta algo, el servicio no arranca y el log indica qué
+    variable revisar (sin mostrar sus valores).
+    """
     if settings.environment != "production":
         return
     if settings.secret_key == Settings.model_fields["secret_key"].default:
         raise RuntimeError("Define SECRET_KEY en las variables de entorno antes de desplegar")
     if settings.email_backend != "smtp":
         raise RuntimeError("En producción EMAIL_BACKEND debe ser 'smtp'")
+    missing = [
+        name
+        for name, value in (
+            ("SMTP_HOST", settings.smtp_host),
+            ("SMTP_USER", settings.smtp_user),
+            ("SMTP_PASSWORD", settings.smtp_password),
+        )
+        if not value
+    ]
+    if missing:
+        raise RuntimeError(f"Faltan variables de correo: {', '.join(missing)}")
 
 
 @asynccontextmanager

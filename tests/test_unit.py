@@ -189,6 +189,26 @@ def test_register_schema_rejects_invalid_email():
         UserRegister(email="no-es-un-correo", password="Secreta123", full_name="Ana")
 
 
+# ---------- Configuración de producción ----------
+
+
+def test_production_requires_smtp_settings(monkeypatch):
+    """En producción la app no arranca si faltan los datos SMTP."""
+    from app.config import settings
+    from app.main import check_production_settings
+
+    monkeypatch.setattr(settings, "environment", "production")
+    monkeypatch.setattr(settings, "email_backend", "smtp")
+    monkeypatch.setattr(settings, "smtp_user", "")
+    monkeypatch.setattr(settings, "smtp_password", "")
+    with pytest.raises(RuntimeError, match="SMTP_USER, SMTP_PASSWORD"):
+        check_production_settings()
+
+    monkeypatch.setattr(settings, "smtp_user", "app@example.com")
+    monkeypatch.setattr(settings, "smtp_password", "clave-de-aplicacion")
+    check_production_settings()  # configuración completa: no lanza error
+
+
 # ---------- Middleware y rate limiting ----------
 
 
