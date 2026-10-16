@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from app.models import OTPCode
+from app.models import OTPCode, User
 from tests.conftest import PASSWORD
 
 
@@ -12,42 +12,49 @@ def login(client, email: str, password: str = PASSWORD):
 
 
 def test_full_authentication_flow(client, outbox):
-    """Registro -> login -> OTP -> perfil -> refresh -> logout."""
-    # 1. Registro
+    """Registro + verificación de correo -> login -> OTP -> perfil -> refresh -> logout."""
+    # 1. Registro: no entrega token, envía un OTP para verificar el correo
     response = client.post(
         "/auth/register", json={"email": "Ana@Example.com", "password": PASSWORD, "full_name": "Ana Pérez"}
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["email"] == "ana@example.com"  # se normaliza a minúsculas
-    assert "password" not in body and "password_hash" not in body
+    assert body["email"] == "a**@example.com"  # correo normalizado y enmascarado
+    assert "access_token" not in body and "password" not in response.text
+    assert len(outbox) == 1 and outbox[0]["to"] == "ana@example.com"
 
-    # 2. Login: no entrega token, envía el OTP por correo
+    # 2. Verificar el correo con el OTP del registro -> JWT y cuenta verificada
+    response = client.post("/auth/verify-otp", json={"email": "ana@example.com", "code": outbox[0]["code"]})
+    assert response.status_code == 200
+    first_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+    assert client.get("/users/profile", headers=first_headers).json()["email_verified"] is True
+
+    # 3. Login: no entrega token, envía otro OTP (segundo factor)
     response = login(client, "ana@example.com")
     assert response.status_code == 200
     assert "access_token" not in response.json()
     assert response.json()["otp_expires_in"] == 15 * 60
-    assert len(outbox) == 1 and outbox[0]["to"] == "ana@example.com"
+    assert len(outbox) == 2
 
-    # 3. Verificación del OTP -> JWT
-    response = client.post("/auth/verify-otp", json={"email": "ana@example.com", "code": outbox[0]["code"]})
+    # 4. Verificación del OTP del login -> JWT
+    response = client.post("/auth/verify-otp", json={"email": "ana@example.com", "code": outbox[1]["code"]})
     assert response.status_code == 200
     token = response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 4. Ruta protegida
+    # 5. Ruta protegida
     response = client.get("/users/profile", headers=headers)
     assert response.status_code == 200
     assert response.json()["full_name"] == "Ana Pérez"
 
-    # 5. Refresh: el token nuevo funciona y el anterior queda revocado
+    # 6. Refresh: el token nuevo funciona y el anterior queda revocado
     response = client.post("/auth/refresh", headers=headers)
     assert response.status_code == 200
     new_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
     assert client.get("/users/profile", headers=headers).status_code == 401
     assert client.get("/users/profile", headers=new_headers).status_code == 200
 
-    # 6. Logout: el token deja de funcionar
+    # 7. Logout: el token deja de funcionar
     assert client.post("/auth/logout", headers=new_headers).status_code == 200
     assert client.get("/users/profile", headers=new_headers).status_code == 401
 
@@ -62,6 +69,45 @@ def test_register_duplicate_and_invalid_data(client, registered_user):
     fields = {err["field"] for err in response.json()["errors"]}
     assert {"email", "password", "full_name"} <= fields
     assert "abc" not in response.text  # no se expone el valor enviado
+
+
+def test_unverified_registration_can_be_reclaimed_after_expiry(client, outbox, db):
+    """Un registro sin verificar bloquea el correo 15 min; después, el dueño real puede registrarse."""
+    intruder = {"email": "victima@example.com", "password": "Intruso123", "full_name": "Intruso"}
+    owner = {"email": "victima@example.com", "password": "Duenio1234", "full_name": "Dueño Real"}
+    assert client.post("/auth/register", json=intruder).status_code == 201
+
+    # Dentro de la ventana de verificación el correo está ocupado.
+    assert client.post("/auth/register", json=owner).status_code == 409
+
+    # Pasada la ventana sin verificar, el registro se reemplaza.
+    db.query(User).filter_by(email="victima@example.com").update(
+        {"updated_at": datetime.now(timezone.utc) - timedelta(minutes=16)}
+    )
+    db.commit()
+    assert client.post("/auth/register", json=owner).status_code == 201
+    response = client.post("/auth/verify-otp", json={"email": owner["email"], "code": outbox[-1]["code"]})
+    assert response.status_code == 200
+
+    # La contraseña del intruso ya no sirve; la del dueño sí.
+    assert login(client, owner["email"], intruder["password"]).status_code == 401
+    assert login(client, owner["email"], owner["password"]).status_code == 200
+
+
+def test_registration_otp_invalidated_by_login(client, outbox):
+    """Un usuario sin verificar puede verificarse con el OTP del login (el del registro deja de valer)."""
+    data = {"email": "luis@example.com", "password": PASSWORD, "full_name": "Luis"}
+    client.post("/auth/register", json=data)
+    register_code = outbox[-1]["code"]
+    login(client, data["email"])
+    login_code = outbox[-1]["code"]
+
+    if register_code != login_code:
+        assert client.post("/auth/verify-otp", json={"email": data["email"], "code": register_code}).status_code == 401
+    response = client.post("/auth/verify-otp", json={"email": data["email"], "code": login_code})
+    assert response.status_code == 200
+    headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+    assert client.get("/users/profile", headers=headers).json()["email_verified"] is True
 
 
 def test_login_with_wrong_credentials(client, registered_user, outbox):

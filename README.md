@@ -25,7 +25,7 @@ Aplicación web de gestión de tareas protegida por un sistema de autenticación
 
 ### Autenticación (requisitos del parcial)
 
-1. Registro de usuarios con validación de formato de correo y fortaleza de contraseña.
+1. Registro de usuarios con validación de email: se comprueba el formato y, además, que el correo **existe y es del usuario**: el registro envía un OTP y la cuenta queda sin verificar hasta confirmarlo. Un registro abandonado sin verificar puede reclamarlo el dueño real del correo pasados 15 minutos.
 2. Login con correo y contraseña (primer factor).
 3. Generación de código OTP de 6 dígitos con validez de 15 minutos.
 4. Envío del OTP por correo electrónico (SMTP con `smtplib`, o API HTTPS de Brevo en producción).
@@ -142,7 +142,7 @@ El envío está implementado con `smtplib` (librería estándar), como pide el e
 
 | Método | Ruta | Descripción | Auth | Rate limit |
 |---|---|---|---|---|
-| POST | `/auth/register` | Registrar nuevo usuario | No | 5/min |
+| POST | `/auth/register` | Registrar nuevo usuario y enviar OTP de verificación del correo | No | 5/min |
 | POST | `/auth/login` | Login y envío de OTP | No | 5/min |
 | POST | `/auth/verify-otp` | Verificar OTP y obtener JWT | No | 5/min |
 | POST | `/auth/resend-otp` | Reenviar código OTP | No | 3/min |
@@ -179,17 +179,18 @@ Las rutas con autenticación requieren la cabecera `Authorization: Bearer <token
 ## Ejemplo de uso con la API
 
 ```bash
-# 1. Registro
+# 1. Registro -> se envía un OTP para verificar el correo
 curl -X POST http://127.0.0.1:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "ana@example.com", "password": "Secreta123", "full_name": "Ana Pérez"}'
+# {"message": "Cuenta creada. Te enviamos un código...", "email": "a**@example.com", "otp_expires_in": 900}
 
-# 2. Login -> se envía el OTP al correo
+# 2. En los siguientes inicios de sesión: login -> se envía un nuevo OTP
 curl -X POST http://127.0.0.1:8000/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "ana@example.com", "password": "Secreta123"}'
 
-# 3. Verificar el OTP recibido -> JWT
+# 3. Verificar el OTP recibido (del registro o del login) -> JWT
 curl -X POST http://127.0.0.1:8000/auth/verify-otp \
   -H "Content-Type: application/json" \
   -d '{"email": "ana@example.com", "code": "482913"}'
@@ -232,7 +233,7 @@ SQLite gestionada con SQLAlchemy. Las tablas se crean automáticamente al arranc
 
 | Tabla | Campos | Descripción |
 |---|---|---|
-| `users` | `id`, `email`, `password_hash`, `full_name`, `created_at`, `updated_at` | Usuarios registrados |
+| `users` | `id`, `email`, `password_hash`, `full_name`, `email_verified`, `created_at`, `updated_at` | Usuarios registrados (`email_verified` se añadió para confirmar el correo) |
 | `otp_codes` | `id`, `user_id`, `code`, `expires_at`, `used`, `created_at` | Códigos OTP (hash) con su expiración |
 | `login_sessions` | `id`, `user_id`, `token`, `expires_at`, `created_at` | Sesiones activas (hash del token) |
 | `tasks` | `id`, `user_id`, `title`, `description`, `priority`, `due_date`, `completed`, `created_at`, `updated_at` | Tareas de cada usuario |
@@ -246,7 +247,7 @@ pytest
 Los tests usan una base de datos temporal y un envío de correo simulado, así que no necesitan conexión ni credenciales.
 
 - **Unitarios** (`tests/test_unit.py`): hashing de contraseñas, creación/expiración/manipulación de JWT, generación y validación de OTP (uso único, expiración, invalidación), envío por Brevo (simulado) sin filtrar secretos, enmascarado de correo, validaciones de esquemas, configuración de producción, rutas protegidas y rate limiter.
-- **Integración de autenticación** (`tests/test_integration.py`): flujo completo registro → login → OTP → perfil → refresh → logout, registro duplicado e inválido, credenciales incorrectas, OTP incorrecto/reutilizado/expirado, rutas protegidas sin token, reenvío de OTP, actualización de perfil, rate limiting, cabeceras de seguridad e interfaz web.
+- **Integración de autenticación** (`tests/test_integration.py`): flujo completo registro → verificación del correo → login → OTP → perfil → refresh → logout, registro duplicado e inválido, reclamación de registros sin verificar, credenciales incorrectas, OTP incorrecto/reutilizado/expirado, rutas protegidas sin token, reenvío de OTP, actualización de perfil, rate limiting, cabeceras de seguridad e interfaz web.
 - **Integración de tareas** (`tests/test_tasks.py`): CRUD, validaciones, aislamiento entre usuarios, filtros, orden, resumen e intento de inyección SQL.
 
 ## Despliegue en Render

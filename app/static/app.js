@@ -170,12 +170,11 @@ async function handleRegister(event) {
   const values = Object.fromEntries(new FormData(form));
   await withSubmitLock(form, async () => {
     try {
-      await api("/auth/register", { method: "POST", body: values, auth: false });
-      toast("Cuenta creada. Ahora inicia sesión.", "success");
+      // El registro envía un OTP: verificarlo confirma el correo e inicia sesión.
+      const data = await api("/auth/register", { method: "POST", body: values, auth: false });
+      toast("Cuenta creada. Revisa tu correo para verificarla.", "success");
       form.reset();
-      switchTab("login");
-      $("#form-login").email.value = values.email;
-      $("#form-login").password.focus();
+      startOtpStep(values.email, data.email, data.otp_expires_in);
     } catch (err) {
       toast(err.message, "error");
     }

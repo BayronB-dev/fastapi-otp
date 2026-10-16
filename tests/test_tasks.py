@@ -6,9 +6,8 @@ from tests.conftest import PASSWORD
 
 
 def login_as(client, outbox, email: str, name: str = "Otro Usuario") -> dict:
-    """Registra un usuario, completa login + OTP y devuelve su cabecera Authorization."""
+    """Registra un usuario, verifica su correo con el OTP y devuelve su cabecera Authorization."""
     client.post("/auth/register", json={"email": email, "password": PASSWORD, "full_name": name})
-    client.post("/auth/login", json={"email": email, "password": PASSWORD})
     token = client.post("/auth/verify-otp", json={"email": email, "code": outbox[-1]["code"]}).json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

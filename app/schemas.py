@@ -90,6 +90,7 @@ class UserOut(BaseModel):
                 "id": 1,
                 "email": "ana@example.com",
                 "full_name": "Ana Pérez",
+                "email_verified": True,
                 "created_at": "2026-10-15T14:00:00Z",
                 "updated_at": "2026-10-15T14:00:00Z",
             }
@@ -99,6 +100,7 @@ class UserOut(BaseModel):
     id: int
     email: EmailStr
     full_name: str
+    email_verified: bool
     created_at: datetime
     updated_at: datetime
 
@@ -115,8 +117,8 @@ class MessageOut(BaseModel):
     message: str = Field(examples=["Operación realizada correctamente"])
 
 
-class LoginOut(MessageOut):
-    """Respuesta del login: confirma el envío del OTP sin revelar el código."""
+class OTPSentOut(MessageOut):
+    """Respuesta del registro y del login: confirma el envío del OTP sin revelar el código."""
 
     email: str = Field(examples=["a***@example.com"], description="Correo enmascarado al que se envió el código")
     otp_expires_in: int = Field(examples=[900], description="Segundos de validez del código")

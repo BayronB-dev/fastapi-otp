@@ -65,11 +65,18 @@ def client():
 
 
 @pytest.fixture
-def registered_user(client):
-    """Registra un usuario de prueba y devuelve sus datos."""
+def registered_user(client, outbox):
+    """Registra un usuario y verifica su correo con el OTP del registro.
+
+    Al terminar, la bandeja simulada queda vacía para que cada test cuente
+    solo los correos que provoca él mismo.
+    """
     data = {"email": "ana@example.com", "password": PASSWORD, "full_name": "Ana Pérez"}
     response = client.post("/auth/register", json=data)
     assert response.status_code == 201
+    response = client.post("/auth/verify-otp", json={"email": data["email"], "code": outbox[-1]["code"]})
+    assert response.status_code == 200
+    outbox.clear()
     return data
 
 
