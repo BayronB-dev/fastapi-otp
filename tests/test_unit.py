@@ -209,6 +209,79 @@ def test_production_requires_smtp_settings(monkeypatch):
     check_production_settings()  # configuración completa: no lanza error
 
 
+def test_production_requires_brevo_settings(monkeypatch):
+    """Con Brevo se exigen la API key y el remitente; 'console' no se permite."""
+    from app.config import settings
+    from app.main import check_production_settings
+
+    monkeypatch.setattr(settings, "environment", "production")
+    monkeypatch.setattr(settings, "email_backend", "brevo")
+    monkeypatch.setattr(settings, "brevo_api_key", "")
+    monkeypatch.setattr(settings, "smtp_from", "app@example.com")
+    with pytest.raises(RuntimeError, match="BREVO_API_KEY"):
+        check_production_settings()
+
+    monkeypatch.setattr(settings, "brevo_api_key", "xkeysib-prueba")
+    check_production_settings()
+
+    monkeypatch.setattr(settings, "email_backend", "console")
+    with pytest.raises(RuntimeError):
+        check_production_settings()
+
+
+def test_send_otp_via_brevo(monkeypatch):
+    """El correo se envía a la API de Brevo con la API key y el destinatario correctos."""
+    import json as json_lib
+
+    from app.config import settings
+    from app.services import email_service
+
+    monkeypatch.setattr(settings, "email_backend", "brevo")
+    monkeypatch.setattr(settings, "brevo_api_key", "xkeysib-prueba")
+    monkeypatch.setattr(settings, "smtp_from", "app@example.com")
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["headers"] = {k.lower(): v for k, v in request.header_items()}
+        captured["body"] = json_lib.loads(request.data)
+        response = MagicMock(status=201)
+        response.__enter__.return_value = response
+        return response
+
+    monkeypatch.setattr(email_service.urllib.request, "urlopen", fake_urlopen)
+    email_service.send_otp_email("ana@example.com", "Ana <b>", "123456")
+
+    assert captured["url"] == email_service.BREVO_API_URL
+    assert captured["headers"]["api-key"] == "xkeysib-prueba"
+    assert captured["body"]["to"] == [{"email": "ana@example.com", "name": "Ana <b>"}]
+    assert captured["body"]["sender"]["email"] == "app@example.com"
+    assert "123456" in captured["body"]["subject"]
+    assert "Ana &lt;b&gt;" in captured["body"]["htmlContent"]  # nombre escapado
+
+
+def test_brevo_errors_are_logged_without_secrets(monkeypatch, caplog):
+    """Si Brevo falla, se registra el error sin la API key ni el código."""
+    import urllib.error
+
+    from app.config import settings
+    from app.services import email_service
+
+    monkeypatch.setattr(settings, "email_backend", "brevo")
+    monkeypatch.setattr(settings, "brevo_api_key", "xkeysib-secreta")
+    monkeypatch.setattr(settings, "smtp_from", "app@example.com")
+
+    def failing_urlopen(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
+
+    monkeypatch.setattr(email_service.urllib.request, "urlopen", failing_urlopen)
+    email_service.send_otp_email("ana@example.com", "Ana", "654321")  # no lanza excepción
+
+    assert "Brevo respondió 401" in caplog.text
+    assert "xkeysib-secreta" not in caplog.text
+    assert "654321" not in caplog.text
+
+
 # ---------- Middleware y rate limiting ----------
 
 

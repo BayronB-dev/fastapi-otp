@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     otp_digits: int = 6
 
     # Correo
-    email_backend: str = "console"  # "console" | "smtp"
+    email_backend: str = "console"  # "console" | "smtp" | "brevo"
+    brevo_api_key: str = ""
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_user: str = ""

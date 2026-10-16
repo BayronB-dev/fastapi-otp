@@ -19,18 +19,11 @@ services:
         value: "30"
       - key: OTP_EXPIRE_MINUTES
         value: "15"
+      # Render gratis bloquea los puertos SMTP, así que se usa la API HTTPS de Brevo.
       - key: EMAIL_BACKEND
-        value: smtp
-      - key: SMTP_HOST
-        value: smtp.gmail.com
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USE_TLS
-        value: "true"
+        value: brevo
       # Estos se completan a mano en el panel de Render (no se suben al repo).
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASSWORD
+      - key: BREVO_API_KEY
         sync: false
       - key: SMTP_FROM
         sync: false
