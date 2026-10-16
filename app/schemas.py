@@ -1,9 +1,12 @@
 """Esquemas Pydantic: validan los datos de entrada y dan forma a las respuestas."""
 
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+Priority = Literal["baja", "media", "alta"]
 
 
 def validate_password_strength(value: str) -> str:
@@ -117,6 +120,92 @@ class LoginOut(MessageOut):
 
     email: str = Field(examples=["a***@example.com"], description="Correo enmascarado al que se envió el código")
     otp_expires_in: int = Field(examples=[900], description="Segundos de validez del código")
+
+
+# ---------- Tareas ----------
+
+
+class TaskCreate(BaseModel):
+    """Datos para crear una tarea."""
+
+    title: str = Field(min_length=1, max_length=200, examples=["Estudiar para el parcial"])
+    description: str = Field(default="", max_length=2000, examples=["Repasar JWT, OTP y middleware"])
+    priority: Priority = Field(default="media", examples=["alta"])
+    due_date: date | None = Field(default=None, examples=["2026-10-16"])
+
+    @field_validator("title")
+    @classmethod
+    def strip_title(cls, value: str) -> str:
+        """El título no puede quedar vacío tras quitar espacios."""
+        value = value.strip()
+        if not value:
+            raise ValueError("El título no puede estar vacío")
+        return value
+
+
+class TaskUpdate(BaseModel):
+    """Campos editables de una tarea; solo se modifican los que se envían."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=200, examples=["Estudiar para el parcial"])
+    description: str | None = Field(default=None, max_length=2000)
+    priority: Priority | None = Field(default=None, examples=["baja"])
+    due_date: date | None = Field(default=None, examples=["2026-10-20"])
+    completed: bool | None = Field(default=None, examples=[True])
+
+    @field_validator("title")
+    @classmethod
+    def strip_title(cls, value: str | None) -> str | None:
+        """El título no puede quedar vacío tras quitar espacios."""
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("El título no puede estar vacío")
+        return value
+
+
+class TaskOut(BaseModel):
+    """Tarea devuelta por la API."""
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": 1,
+                "title": "Estudiar para el parcial",
+                "description": "Repasar JWT, OTP y middleware",
+                "priority": "alta",
+                "due_date": "2026-10-16",
+                "completed": False,
+                "created_at": "2026-10-15T14:00:00Z",
+                "updated_at": "2026-10-15T14:00:00Z",
+            }
+        },
+    )
+
+    id: int
+    title: str
+    description: str
+    priority: Priority
+    due_date: date | None
+    completed: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def ensure_utc(cls, value: datetime) -> datetime:
+        """SQLite devuelve fechas sin zona horaria; se marcan como UTC."""
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+class TaskSummary(BaseModel):
+    """Resumen de las tareas del usuario para el panel."""
+
+    total: int = Field(examples=[8])
+    completed: int = Field(examples=[3])
+    pending: int = Field(examples=[5])
+    overdue: int = Field(examples=[1], description="Pendientes con fecha límite ya pasada")
 
 
 class TokenOut(BaseModel):

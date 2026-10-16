@@ -288,6 +288,8 @@ def test_brevo_errors_are_logged_without_secrets(monkeypatch, caplog):
 def test_is_protected_paths():
     """Solo las rutas privadas exigen token."""
     assert is_protected("/users/profile")
+    assert is_protected("/tasks")
+    assert is_protected("/tasks/5")
     assert is_protected("/auth/logout")
     assert is_protected("/auth/refresh")
     assert not is_protected("/auth/login")

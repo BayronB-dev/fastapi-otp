@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from app.config import Settings, settings
 from app.database import init_db
 from app.middleware import AuthMiddleware
-from app.routes import auth, users
+from app.routes import auth, tasks, users
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 logger = logging.getLogger("app")
@@ -70,6 +70,7 @@ app.add_middleware(AuthMiddleware)
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(tasks.router)
 
 
 @app.exception_handler(RequestValidationError)

@@ -15,7 +15,7 @@ from app.models import LoginSession, User
 from app.security import as_utc, decode_access_token, hash_token
 
 # Rutas que exigen un token válido. Se comparan por prefijo.
-PROTECTED_PREFIXES: tuple[str, ...] = ("/users", "/auth/refresh", "/auth/logout")
+PROTECTED_PREFIXES: tuple[str, ...] = ("/users", "/tasks", "/auth/refresh", "/auth/logout")
 
 
 def is_protected(path: str) -> bool:
