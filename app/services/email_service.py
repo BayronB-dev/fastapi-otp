@@ -100,6 +100,16 @@ def send_via_smtp(msg: EmailMessage) -> None:
             server.send_message(msg)
 
 
+def brevo_error_reason(exc: urllib.error.HTTPError) -> str:
+    """Extrae el mensaje de error de la respuesta de Brevo (máx. 300 caracteres)."""
+    try:
+        body = json.loads(exc.read().decode("utf-8"))
+        reason = str(body.get("message") or body.get("code") or "sin detalle")
+    except (ValueError, AttributeError, OSError):
+        reason = "sin detalle"
+    return reason[:300]
+
+
 def send_via_brevo(to_email: str, full_name: str, code: str) -> None:
     """Envía el correo con la API transaccional de Brevo (HTTPS, puerto 443).
 
@@ -129,8 +139,9 @@ def send_via_brevo(to_email: str, full_name: str, code: str) -> None:
             if response.status >= 300:
                 raise EmailSendError(f"Brevo respondió {response.status}")
     except urllib.error.HTTPError as exc:
-        # Se registra solo el código HTTP, nunca la API key.
-        raise EmailSendError(f"Brevo respondió {exc.code}") from exc
+        # Se registra el código HTTP y el motivo que da Brevo (p. ej. "Key not
+        # found" o "unrecognised IP address"), nunca la API key ni el OTP.
+        raise EmailSendError(f"Brevo respondió {exc.code}: {brevo_error_reason(exc)}") from exc
     except urllib.error.URLError as exc:
         raise EmailSendError("No se pudo conectar con Brevo") from exc
 

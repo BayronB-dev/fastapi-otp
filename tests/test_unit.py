@@ -261,7 +261,8 @@ def test_send_otp_via_brevo(monkeypatch):
 
 
 def test_brevo_errors_are_logged_without_secrets(monkeypatch, caplog):
-    """Si Brevo falla, se registra el error sin la API key ni el código."""
+    """Si Brevo falla, se registra el motivo sin la API key ni el código."""
+    import io
     import urllib.error
 
     from app.config import settings
@@ -272,12 +273,13 @@ def test_brevo_errors_are_logged_without_secrets(monkeypatch, caplog):
     monkeypatch.setattr(settings, "smtp_from", "app@example.com")
 
     def failing_urlopen(request, timeout):
-        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
+        body = io.BytesIO(b'{"code": "unauthorized", "message": "Key not found"}')
+        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, body)
 
     monkeypatch.setattr(email_service.urllib.request, "urlopen", failing_urlopen)
     email_service.send_otp_email("ana@example.com", "Ana", "654321")  # no lanza excepción
 
-    assert "Brevo respondió 401" in caplog.text
+    assert "Brevo respondió 401: Key not found" in caplog.text
     assert "xkeysib-secreta" not in caplog.text
     assert "654321" not in caplog.text
 
