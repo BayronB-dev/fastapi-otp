@@ -3,10 +3,12 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import Settings, settings
 from app.database import init_db
@@ -75,6 +77,10 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(tasks.router)
 
+# Archivos de la interfaz web (HTML, CSS, JS).
+STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -103,8 +109,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-@app.get("/", tags=["General"])
-def root() -> dict:
+@app.get("/", include_in_schema=False)
+def index() -> FileResponse:
+    """Sirve la interfaz web (aplicación de una sola página)."""
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/api", tags=["General"])
+def api_info() -> dict:
     """Información básica de la API."""
     return {"name": settings.app_name, "docs": "/docs", "status": "ok"}
 

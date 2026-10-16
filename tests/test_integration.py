@@ -177,6 +177,17 @@ def test_security_headers(client):
     assert "Content-Security-Policy" not in client.get("/docs").headers
 
 
+def test_web_interface_is_served(client):
+    """La raíz sirve la interfaz web con CSP estricta y sus archivos estáticos."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "TaskGuard" in response.text
+    assert "script-src 'self'" in response.headers["Content-Security-Policy"]
+    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/styles.css").status_code == 200
+
+
 def test_health_endpoint(client):
     """El endpoint de salud responde sin autenticación."""
     assert client.get("/health").json() == {"status": "ok"}

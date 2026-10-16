@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TaskGuard · Gestor de tareas</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <!-- ============ Autenticación: login / registro ============ -->
+  <main id="view-auth" class="auth-layout" hidden>
+    <section class="auth-card">
+      <div class="brand">
+        <img src="/static/favicon.svg" alt="" width="36" height="36">
+        <div>
+          <h1>TaskGuard</h1>
+          <p class="muted">Tus tareas, protegidas con verificación en dos pasos.</p>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="login" role="tab">Iniciar sesión</button>
+        <button type="button" class="tab" data-tab="register" role="tab">Crear cuenta</button>
+      </div>
+
+      <form id="form-login" class="stack" novalidate>
+        <label>Correo electrónico
+          <input type="email" name="email" autocomplete="email" required>
+        </label>
+        <label>Contraseña
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="btn primary">Continuar</button>
+      </form>
+
+      <form id="form-register" class="stack" novalidate hidden>
+        <label>Nombre completo
+          <input type="text" name="full_name" autocomplete="name" minlength="2" maxlength="150" required>
+        </label>
+        <label>Correo electrónico
+          <input type="email" name="email" autocomplete="email" required>
+        </label>
+        <label>Contraseña
+          <input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+          <small class="muted">Mínimo 8 caracteres, con letras y números.</small>
+        </label>
+        <button type="submit" class="btn primary">Crear cuenta</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- ============ Verificación OTP ============ -->
+  <main id="view-otp" class="auth-layout" hidden>
+    <section class="auth-card">
+      <h1>Verifica tu identidad</h1>
+      <p class="muted">Enviamos un código de 6 dígitos a <strong id="otp-email"></strong>.</p>
+      <form id="form-otp" class="stack" novalidate>
+        <label>Código de verificación
+          <input type="text" name="code" class="otp-input" inputmode="numeric" autocomplete="one-time-code"
+                 pattern="\d{6}" maxlength="6" placeholder="000000" required>
+        </label>
+        <p class="muted small">El código vence en <strong id="otp-timer">15:00</strong>.</p>
+        <button type="submit" class="btn primary">Verificar</button>
+      </form>
+      <div class="row between">
+        <button type="button" id="btn-otp-back" class="btn link">← Volver</button>
+        <button type="button" id="btn-otp-resend" class="btn link">Reenviar código</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ Panel de tareas ============ -->
+  <div id="view-app" hidden>
+    <header class="topbar">
+      <div class="brand small">
+        <img src="/static/favicon.svg" alt="" width="28" height="28">
+        <strong>TaskGuard</strong>
+      </div>
+      <div class="row">
+        <span class="muted hide-sm">Hola, <strong id="user-name"></strong></span>
+        <button type="button" id="btn-profile" class="btn ghost">Perfil</button>
+        <button type="button" id="btn-logout" class="btn ghost">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="stats" aria-label="Resumen">
+        <div class="stat"><span id="stat-total">0</span><small>Total</small></div>
+        <div class="stat"><span id="stat-pending">0</span><small>Pendientes</small></div>
+        <div class="stat"><span id="stat-completed">0</span><small>Completadas</small></div>
+        <div class="stat danger"><span id="stat-overdue">0</span><small>Vencidas</small></div>
+      </section>
+
+      <section class="card">
+        <h2>Nueva tarea</h2>
+        <form id="form-task" class="task-form" novalidate>
+          <input type="text" name="title" placeholder="¿Qué tienes que hacer?" maxlength="200" required>
+          <textarea name="description" placeholder="Descripción (opcional)" maxlength="2000" rows="2"></textarea>
+          <div class="row wrap">
+            <label class="inline">Prioridad
+              <select name="priority">
+                <option value="baja">Baja</option>
+                <option value="media" selected>Media</option>
+                <option value="alta">Alta</option>
+              </select>
+            </label>
+            <label class="inline">Fecha límite
+              <input type="date" name="due_date">
+            </label>
+            <button type="submit" class="btn primary push-right">Añadir</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="row between wrap">
+          <h2>Mis tareas</h2>
+          <div class="row wrap filters">
+            <input type="search" id="filter-search" placeholder="Buscar..." maxlength="100">
+            <select id="filter-status" aria-label="Estado">
+              <option value="">Todas</option>
+              <option value="false">Pendientes</option>
+              <option value="true">Completadas</option>
+            </select>
+            <select id="filter-priority" aria-label="Prioridad">
+              <option value="">Cualquier prioridad</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+          </div>
+        </div>
+        <ul id="task-list" class="task-list"></ul>
+        <p id="task-empty" class="empty muted" hidden>No hay tareas que mostrar.</p>
+      </section>
+    </main>
+  </div>
+
+  <!-- ============ Diálogo: editar tarea ============ -->
+  <dialog id="dialog-task">
+    <form id="form-edit-task" class="stack" novalidate>
+      <h2>Editar tarea</h2>
+      <label>Título <input type="text" name="title" maxlength="200" required></label>
+      <label>Descripción <textarea name="description" maxlength="2000" rows="3"></textarea></label>
+      <div class="row wrap">
+        <label class="inline">Prioridad
+          <select name="priority">
+            <option value="baja">Baja</option>
+            <option value="media">Media</option>
+            <option value="alta">Alta</option>
+          </select>
+        </label>
+        <label class="inline">Fecha límite <input type="date" name="due_date"></label>
+      </div>
+      <div class="row end">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ============ Diálogo: perfil ============ -->
+  <dialog id="dialog-profile">
+    <form id="form-profile" class="stack" novalidate>
+      <h2>Mi perfil</h2>
+      <p class="muted small" id="profile-email"></p>
+      <label>Nombre completo <input type="text" name="full_name" minlength="2" maxlength="150"></label>
+      <fieldset class="stack">
+        <legend>Cambiar contraseña (opcional)</legend>
+        <label>Contraseña actual <input type="password" name="current_password" autocomplete="current-password"></label>
+        <label>Nueva contraseña <input type="password" name="new_password" autocomplete="new-password" minlength="8" maxlength="72"></label>
+      </fieldset>
+      <div class="row end">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>
