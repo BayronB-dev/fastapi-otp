@@ -4,6 +4,8 @@ Aplicación web de gestión de tareas protegida por un sistema de autenticación
 
 **Stack:** FastAPI · SQLAlchemy · SQLite · PyOTP · bcrypt · PyJWT · smtplib / Brevo · pytest · HTML + CSS + JavaScript
 
+**Aplicación desplegada:** https://auth-otp-api.onrender.com · **Documentación de la API:** https://auth-otp-api.onrender.com/docs
+
 ---
 
 ## Contenido
@@ -76,11 +78,10 @@ parcial-fastapi-otp/
 │   ├── test_unit.py         # Tests unitarios
 │   ├── test_integration.py  # Tests de integración de autenticación
 │   └── test_tasks.py        # Tests de integración del gestor de tareas
-├── .env.example
+├── .env.example             # Plantilla de variables de entorno
+├── .python-version          # Versión de Python usada en el despliegue
 ├── requirements.txt
-├── Procfile                 # Comando de arranque (Railway / Heroku)
-├── render.yaml              # Blueprint de despliegue en Render
-└── pytest.ini
+└── render.yaml              # Blueprint de despliegue en Render
 ```
 
 ## Instalación local
@@ -262,8 +263,6 @@ Los tests usan una base de datos temporal y un envío de correo simulado, así q
    - `SECRET_KEY` generada automáticamente, `ENVIRONMENT=production` y `EMAIL_BACKEND=brevo`.
 3. Completa las variables `BREVO_API_KEY` y `SMTP_FROM` (el correo verificado en Brevo).
 4. Al terminar el despliegue, abre `https://<tu-servicio>.onrender.com`.
-
-Para **Railway** o **Heroku** se usa el `Procfile` con el mismo comando y las variables de entorno de la tabla anterior.
 
 **Notas:**
 - En el plan gratuito de Render el disco es efímero: la base SQLite se reinicia en cada despliegue o reinicio. Para conservar datos se puede añadir un disco persistente y apuntar `DATABASE_URL` a él.
