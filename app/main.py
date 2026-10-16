@@ -60,9 +60,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title=settings.app_name,
     description=(
-        "API de autenticación con dos factores: contraseña + código OTP enviado por correo.\n\n"
+        "Gestor de tareas protegido con autenticación en dos factores: contraseña + código OTP "
+        "enviado por correo.\n\n"
         "**Flujo:** `/auth/register` → `/auth/login` (envía OTP) → `/auth/verify-otp` (devuelve JWT) → "
-        "usar el token en el botón *Authorize* para las rutas protegidas."
+        "usar el token en el botón *Authorize* para las rutas protegidas (`/users`, `/tasks`)."
     ),
     version="1.0.0",
     lifespan=lifespan,

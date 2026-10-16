@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "Auth OTP API"
+    app_name: str = "TaskGuard"
     environment: str = "development"
 
     # JWT
