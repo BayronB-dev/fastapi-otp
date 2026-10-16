@@ -221,12 +221,25 @@ def test_production_requires_brevo_settings(monkeypatch):
     with pytest.raises(RuntimeError, match="BREVO_API_KEY"):
         check_production_settings()
 
+    # Una clave SMTP de Brevo se detecta al arrancar.
+    monkeypatch.setattr(settings, "brevo_api_key", "xsmtpsib-prueba")
+    with pytest.raises(RuntimeError, match="clave SMTP"):
+        check_production_settings()
+
     monkeypatch.setattr(settings, "brevo_api_key", "xkeysib-prueba")
     check_production_settings()
 
     monkeypatch.setattr(settings, "email_backend", "console")
     with pytest.raises(RuntimeError):
         check_production_settings()
+
+
+def test_settings_strip_whitespace_from_pasted_keys(monkeypatch):
+    """Los espacios o saltos de línea al pegar una clave se eliminan."""
+    from app.config import Settings
+
+    monkeypatch.setenv("BREVO_API_KEY", "  xkeysib-abc123\n")
+    assert Settings().brevo_api_key == "xkeysib-abc123"
 
 
 def test_send_otp_via_brevo(monkeypatch):

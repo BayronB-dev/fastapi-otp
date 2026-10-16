@@ -12,7 +12,11 @@ class Settings(BaseSettings):
     nombre (sin distinguir mayúsculas) o desde el archivo ``.env``.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # str_strip_whitespace: quita espacios o saltos de línea que se cuelan al
+    # pegar claves en el panel del proveedor (p. ej. en BREVO_API_KEY).
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", str_strip_whitespace=True
+    )
 
     app_name: str = "TaskGuard"
     environment: str = "development"

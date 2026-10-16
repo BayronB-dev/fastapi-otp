@@ -46,6 +46,12 @@ def check_production_settings() -> None:
     missing = [name for name, value in required if not value]
     if missing:
         raise RuntimeError(f"Faltan variables de correo: {', '.join(missing)}")
+    # Brevo muestra dos claves parecidas; la SMTP (xsmtpsib-) no sirve para su API.
+    if settings.email_backend == "brevo" and settings.brevo_api_key.startswith("xsmtpsib-"):
+        raise RuntimeError(
+            "BREVO_API_KEY es una clave SMTP (xsmtpsib-). Usa una API key (xkeysib-) "
+            "de Brevo: SMTP & API -> API Keys"
+        )
 
 
 @asynccontextmanager
